@@ -24,6 +24,7 @@
         <button type="button" data-size="6">6×6</button>
       </div>
       <div class="toggles">
+        <button type="button" class="pill-btn" id="btn-demo"><span aria-hidden="true">▶</span> Demo</button>
         <label class="switch">
           <input type="checkbox" id="live">
           <span class="track"><span class="thumb"></span></span>
@@ -65,6 +66,7 @@
     <details class="rules" id="rules">
       <summary>Com es juga</summary>
       <div class="rules-body">
+        <p><button type="button" class="btn" id="btn-demo-2"><span aria-hidden="true">▶</span> Mira la demo animada</button></p>
         <p>Totes les caselles, menys les dels espies, tenen una peça. Reorganitza-les fins que es compleixin aquestes tres condicions:</p>
         <ol>
           <li>Cada <strong>fletxa</strong> apunta a la casella del costat en la seva direcció, i allà hi ha d'haver una <strong>peça blanca</strong>.</li>
@@ -112,6 +114,27 @@
         <button class="btn primary" id="m-next" type="button">Següent nivell <span aria-hidden="true">→</span></button>
         <button class="btn" id="m-replay" type="button">Un altre d'aquest nivell</button>
         <button class="btn ghost" id="m-close" type="button">Veure el tauler</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="demo" class="modal" hidden>
+    <div class="dialog demo-dialog" role="dialog" aria-modal="true" aria-labelledby="demo-title">
+      <span class="stamp">Instruccions</span>
+      <h2 id="demo-title">Com es juga</h2>
+      <div class="demo-stage" id="demo-stage">
+        <div id="demo-board" class="board demo-board" aria-hidden="true"></div>
+        <div class="demo-cursor" id="demo-cursor" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 2 L4 20 L9 15.2 L12.4 22 L15.6 20.4 L12.2 13.8 L19 13.8 Z" fill="#fff" stroke="#111" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          <span class="demo-tag" id="demo-tag"></span>
+        </div>
+      </div>
+      <p class="demo-caption" id="demo-caption" aria-live="polite"></p>
+      <div class="demo-dots" id="demo-dots" aria-hidden="true"></div>
+      <div class="demo-actions">
+        <button class="btn" id="demo-pause" type="button">Pausa</button>
+        <button class="btn" id="demo-restart" type="button"><span aria-hidden="true">↺</span> Torna a veure</button>
+        <button class="btn primary" id="demo-close" type="button">A jugar!</button>
       </div>
     </div>
   </div>

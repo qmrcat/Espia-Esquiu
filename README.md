@@ -43,6 +43,7 @@ Amb el ratolí, en passar per sobre d'una fletxa es ressalta la casella on apunt
 
 ## Ajudes i puntuació
 
+- **Demo:** el botó «▶ Demo» (o «Mira la demo animada», a «Com es juga») obre un tauler 3×3 on un cursor resol el trencaclosques pas a pas, amb explicacions. Es pot posar en pausa, tornar a veure i tancar amb <kbd>Esc</kbd>. Mentre està oberta, el temps de la partida s'atura.
 - **Peces blanques soles:** sempre es marquen les que encara no rep cap fletxa.
 - **Errors en directe:** interruptor per veure tots els errors mentre jugues.
 - **Comprovar:** mostra els errors durant uns segons i explica el primer.
@@ -70,6 +71,7 @@ README.md    Aquest document
 | `analyze()` | Retorna els errors del tauler: `out`, `spy`, `arrow` i `lonely` (peça blanca sense fletxa). |
 | `afterChange()` | Actualitza marques, marcador i botons després de cada moviment, i detecta la victòria. |
 | `doSwap()` / `doRotate()` / `undo()` / `hint()` | Accions del jugador. |
+| `runDemo()` / `DEMO_STEPS` | Demo animada: tauler inicial (`DEMO_START`) i passos amb el text i les accions de cada un. |
 | `sfx()` / `confetti()` | Sons (Web Audio) i confeti (canvas), generats al moment sense fitxers. |
 
 Les direccions es guarden com un índex de 0 a 7 en sentit horari, començant per «amunt». Els índexs parells són rectes i els senars, diagonals.

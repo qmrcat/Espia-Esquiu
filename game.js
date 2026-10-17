@@ -247,24 +247,29 @@
 
   // ---------- Anàlisi del tauler ----------
 
-  function analyze() {
+  // Funciona amb qualsevol tauler (el de joc o el de la demo).
+  function analyzeGrid(size, grid, spySet) {
     const errors = new Map();
     const covered = new Set();
-    const n = S.size * S.size;
+    const n = size * size;
     for (let i = 0; i < n; i++) {
-      const p = S.grid[i];
+      const p = grid[i];
       if (!p || p.kind !== 'arrow') continue;
-      const j = neighbor(S.size, i, dirOf(p));
+      const j = neighbor(size, i, dirOf(p));
       if (j < 0) errors.set(i, 'out');
-      else if (S.spySet.has(j)) errors.set(i, 'spy');
-      else if (S.grid[j].kind === 'arrow') errors.set(i, 'arrow');
+      else if (spySet.has(j)) errors.set(i, 'spy');
+      else if (grid[j].kind === 'arrow') errors.set(i, 'arrow');
       else covered.add(j);
     }
     for (let i = 0; i < n; i++) {
-      const p = S.grid[i];
+      const p = grid[i];
       if (p && p.kind === 'blank' && !covered.has(i)) errors.set(i, 'lonely');
     }
     return errors;
+  }
+
+  function analyze() {
+    return analyzeGrid(S.size, S.grid, S.spySet);
   }
 
   function describeError(i, code) {
@@ -418,16 +423,20 @@
     board.querySelectorAll(classes.map((c) => '.' + c).join(',')).forEach((el) => el.classList.remove(...classes));
   }
 
-  function updateAim() {
-    clearMarks('aim', 'aim-bad', 'aim-out');
-    const i = S.aim;
-    if (i < 0 || S.solved || drag) return;
-    const p = S.grid[i];
+  // Ressalta la casella on apunta la fletxa de la posició i (verd si és correcte).
+  function markAim(root, size, grid, cells, spySet, i) {
+    root.querySelectorAll('.aim, .aim-bad, .aim-out').forEach((el) => el.classList.remove('aim', 'aim-bad', 'aim-out'));
+    if (i < 0) return;
+    const p = grid[i];
     if (!p || p.kind !== 'arrow') return;
-    const j = neighbor(S.size, i, dirOf(p));
+    const j = neighbor(size, i, dirOf(p));
     if (j < 0) p.el.classList.add('aim-out');
-    else if (S.spySet.has(j)) S.cells[j].classList.add('aim-bad');
-    else S.grid[j].el.classList.add(S.grid[j].kind === 'blank' ? 'aim' : 'aim-bad');
+    else if (spySet.has(j)) cells[j].classList.add('aim-bad');
+    else grid[j].el.classList.add(grid[j].kind === 'blank' ? 'aim' : 'aim-bad');
+  }
+
+  function updateAim() {
+    markAim(board, S.size, S.grid, S.cells, S.spySet, (S.solved || drag) ? -1 : S.aim);
   }
 
   function updateCursor() {
@@ -922,10 +931,267 @@
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
       e.preventDefault();
       undo();
-    } else if (e.key === 'Escape' && !ui.modal.hidden) {
-      hideModal();
+    } else if (e.key === 'Escape') {
+      if (!demoUI.modal.hidden) closeDemo();
+      else if (!ui.modal.hidden) hideModal();
     }
   });
+
+  // ---------- Demo animada ----------
+  // Un tauler 3×3 independent del joc on un cursor fictici resol el trencaclosques pas a pas.
+
+  const DEMO_SIZE = 3;
+  const DEMO_SPIES = new Set([0]);
+  // Angles: 0 = amunt, 45 = amunt-dreta, 90 = dreta, 180 = avall, 315 = amunt-esquerra...
+  const DEMO_START = [
+    null,
+    { kind: 'arrow', family: 'diag', angle: 45 },
+    { kind: 'arrow', family: 'ortho', angle: 90 },
+    { kind: 'blank' },
+    { kind: 'arrow', family: 'diag', angle: 315 },
+    { kind: 'blank' },
+    { kind: 'blank' },
+    { kind: 'blank' },
+    { kind: 'arrow', family: 'ortho', angle: 180 }
+  ];
+
+  const CANCELLED = Symbol('demo-cancelled');
+  const demo = { grid: [], cells: [], aim: -1, token: null, paused: false, timerWasRunning: false };
+  const demoUI = {
+    modal: $('#demo'),
+    stage: $('#demo-stage'),
+    board: $('#demo-board'),
+    cursor: $('#demo-cursor'),
+    tag: $('#demo-tag'),
+    caption: $('#demo-caption'),
+    dots: $('#demo-dots'),
+    pause: $('#demo-pause'),
+    restart: $('#demo-restart'),
+    close: $('#demo-close')
+  };
+
+  function setPos(el, idx, size) {
+    el.style.setProperty('--r', Math.floor(idx / size));
+    el.style.setProperty('--c', idx % size);
+    el.style.setProperty('--i', idx);
+  }
+
+  function demoBuild() {
+    const b = demoUI.board;
+    b.innerHTML = '';
+    b.classList.remove('solved');
+    b.style.setProperty('--n', DEMO_SIZE);
+    demo.cells = [];
+    for (let i = 0; i < DEMO_SIZE * DEMO_SIZE; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      if (DEMO_SPIES.has(i)) {
+        cell.classList.add('spy');
+        cell.innerHTML = ICONS.spy;
+      }
+      b.appendChild(cell);
+      demo.cells.push(cell);
+    }
+    const layer = document.createElement('div');
+    layer.className = 'layer';
+    b.appendChild(layer);
+
+    demo.grid = DEMO_START.map((d, i) => {
+      if (!d) return null;
+      const el = document.createElement('div');
+      el.className = `piece ${d.kind}${d.family ? ' ' + d.family : ''}`;
+      el.innerHTML = `<div class="tile"><div class="glyph">${d.kind === 'arrow' ? ICONS.arrow : ICONS.blank}</div></div>`;
+      layer.appendChild(el);
+      const p = { kind: d.kind, family: d.family || null, angle: d.angle || 0, el, glyph: el.querySelector('.glyph') };
+      setPos(el, i, DEMO_SIZE);
+      p.glyph.style.setProperty('--a', `${p.angle}deg`);
+      return p;
+    });
+    demo.aim = -1;
+    demoRefresh();
+
+    // El cursor comença invisible al centre del tauler
+    demoUI.cursor.classList.remove('show', 'hold', 'press', 'tagged');
+    demoUI.cursor.style.transition = 'none';
+    cursorTo(4);
+    void demoUI.cursor.offsetWidth;
+    demoUI.cursor.style.transition = '';
+  }
+
+  function demoRefresh() {
+    const errors = analyzeGrid(DEMO_SIZE, demo.grid, DEMO_SPIES);
+    demo.grid.forEach((p) => { if (p) p.el.classList.remove('lonely'); });
+    errors.forEach((code, i) => { if (code === 'lonely') demo.grid[i].el.classList.add('lonely'); });
+    demoUI.board.classList.toggle('solved', errors.size === 0);
+    markAim(demoUI.board, DEMO_SIZE, demo.grid, demo.cells, DEMO_SPIES, demo.aim);
+  }
+
+  function demoSetAim(i) {
+    demo.aim = i;
+    markAim(demoUI.board, DEMO_SIZE, demo.grid, demo.cells, DEMO_SPIES, i);
+  }
+
+  // Espera que es pot posar en pausa i cancel·lar
+  function dwait(ms) {
+    const token = demo.token;
+    return new Promise((resolve, reject) => {
+      let left = ms;
+      let last = performance.now();
+      const step = () => {
+        if (token.cancelled) { reject(CANCELLED); return; }
+        const now = performance.now();
+        if (!demo.paused) left -= now - last;
+        last = now;
+        if (left <= 0) resolve();
+        else setTimeout(step, 40);
+      };
+      setTimeout(step, 40);
+    });
+  }
+
+  function cursorTo(i) {
+    const stage = demoUI.stage.getBoundingClientRect();
+    const r = demo.cells[i].getBoundingClientRect();
+    const x = r.left - stage.left + r.width * 0.55;
+    const y = r.top - stage.top + r.height * 0.55;
+    demoUI.cursor.style.transform = `translate(${x}px, ${y}px)`;
+  }
+
+  async function moveTo(i) {
+    demoUI.cursor.classList.add('show');
+    cursorTo(i);
+    await dwait(750);
+  }
+
+  function setTag(text) {
+    demoUI.tag.textContent = text;
+    demoUI.cursor.classList.toggle('tagged', !!text);
+  }
+
+  async function demoClick(i, delta, label) {
+    setTag(label);
+    demoUI.cursor.classList.remove('press');
+    void demoUI.cursor.offsetWidth;
+    demoUI.cursor.classList.add('press');
+    await dwait(180);
+    const p = demo.grid[i];
+    p.angle += 90 * delta;
+    p.glyph.style.setProperty('--a', `${p.angle}deg`);
+    demo.aim = i;
+    demoRefresh();
+    await dwait(900);
+    setTag('');
+  }
+
+  async function demoDrag(a, b) {
+    const pa = demo.grid[a];
+    const pb = demo.grid[b];
+    await moveTo(a);
+    setTag('arrossega');
+    demoUI.cursor.classList.add('hold');
+    await dwait(300);
+    pa.el.classList.add('demo-lift');
+    setPos(pa.el, b, DEMO_SIZE);
+    cursorTo(b);
+    await dwait(800);
+    demo.grid[a] = pb;
+    demo.grid[b] = pa;
+    setPos(pb.el, a, DEMO_SIZE);
+    demoUI.cursor.classList.remove('hold');
+    pa.el.classList.remove('demo-lift');
+    setTag('');
+    demoRefresh();
+    await dwait(300);
+  }
+
+  const DEMO_STEPS = [
+    {
+      text: "L'objectiu: cada fletxa ha d'apuntar a una peça blanca del costat, i cada peça blanca ha de rebre almenys una fletxa. Les marcades amb «!» encara no en reben cap.",
+      run: async () => { await dwait(4500); }
+    },
+    {
+      text: "Compte! Aquesta fletxa apunta a l'espia. Un espia no es pot assenyalar mai.",
+      run: async () => { await moveTo(4); demoSetAim(4); await dwait(2800); }
+    },
+    {
+      text: "El clic dret (o Maj+R) la gira 90° cap a l'esquerra. Ara apunta a una peça blanca: el verd vol dir que està bé.",
+      run: async () => { await demoClick(4, -1, 'clic dret'); await dwait(2800); }
+    },
+    {
+      text: 'Aquesta altra apunta fora del tauler. Un clic (o la tecla R) la gira 90° cap a la dreta.',
+      run: async () => { await moveTo(2); demoSetAim(2); await dwait(2000); await demoClick(2, 1, 'clic'); await dwait(2000); }
+    },
+    {
+      text: 'La de la cantonada també surt del tauler. Un altre clic i ja apunta a una peça blanca.',
+      run: async () => { await moveTo(8); demoSetAim(8); await dwait(1800); await demoClick(8, 1, 'clic'); await dwait(2000); }
+    },
+    {
+      text: 'Arrossega una peça sobre una altra per intercanviar-les. Les fletxes diagonals (turquesa) sempre continuen sent diagonals.',
+      run: async () => { demoSetAim(-1); await dwait(1200); await demoDrag(1, 3); demoSetAim(3); await dwait(2600); }
+    },
+    {
+      text: 'Totes les peces blanques reben una fletxa i cap espia no ha estat delatat. Missió complerta! Ara et toca a tu.',
+      run: async () => { demoSetAim(-1); demoUI.cursor.classList.remove('show'); await dwait(600); }
+    }
+  ];
+
+  function renderDots(k) {
+    demoUI.dots.innerHTML = DEMO_STEPS.map((_, i) =>
+      `<span class="${i === k ? 'on' : (i < k ? 'done' : '')}"></span>`).join('');
+  }
+
+  function updatePauseBtn(finished = false) {
+    demoUI.pause.disabled = finished;
+    demoUI.pause.innerHTML = demo.paused
+      ? '<span aria-hidden="true">▶</span> Continua'
+      : '<span aria-hidden="true">❚❚</span> Pausa';
+  }
+
+  async function runDemo() {
+    if (demo.token) demo.token.cancelled = true;
+    demo.token = { cancelled: false };
+    demo.paused = false;
+    updatePauseBtn();
+    demoBuild();
+    try {
+      for (let k = 0; k < DEMO_STEPS.length; k++) {
+        renderDots(k);
+        demoUI.caption.textContent = DEMO_STEPS[k].text;
+        await DEMO_STEPS[k].run();
+      }
+      renderDots(DEMO_STEPS.length);
+      updatePauseBtn(true);
+    } catch (e) {
+      if (e !== CANCELLED) throw e;
+    }
+  }
+
+  function openDemo() {
+    hideModal();
+    demo.timerWasRunning = !!S.timerId;
+    stopTimer();
+    demoUI.modal.hidden = false;
+    demoUI.close.focus();
+    runDemo();
+  }
+
+  function closeDemo() {
+    if (demoUI.modal.hidden) return;
+    if (demo.token) demo.token.cancelled = true;
+    demoUI.modal.hidden = true;
+    if (demo.timerWasRunning && !S.solved) startTimer();
+    board.focus({ preventScroll: true });
+  }
+
+  $('#btn-demo').addEventListener('click', openDemo);
+  $('#btn-demo-2').addEventListener('click', openDemo);
+  demoUI.close.addEventListener('click', closeDemo);
+  demoUI.restart.addEventListener('click', runDemo);
+  demoUI.pause.addEventListener('click', () => {
+    demo.paused = !demo.paused;
+    updatePauseBtn();
+  });
+  demoUI.modal.addEventListener('click', (e) => { if (e.target === demoUI.modal) closeDemo(); });
 
   // ---------- Botons ----------
 
