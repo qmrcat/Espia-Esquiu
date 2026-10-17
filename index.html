@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0c111c">
+  <title>L'Espia Esmunyedís</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <canvas id="confetti" aria-hidden="true"></canvas>
+
+  <main class="app">
+    <header class="top">
+      <span class="stamp">Alt secret</span>
+      <h1>L'Espia <em>Esmunyedís</em></h1>
+      <p class="tagline">Reorganitza les peces perquè cap fletxa delati els espies.</p>
+    </header>
+
+    <section class="toolbar" aria-label="Opcions">
+      <div class="seg" role="group" aria-label="Mida del tauler">
+        <button type="button" data-size="4">4×4</button>
+        <button type="button" data-size="5">5×5</button>
+        <button type="button" data-size="6">6×6</button>
+      </div>
+      <div class="toggles">
+        <label class="switch">
+          <input type="checkbox" id="live">
+          <span class="track"><span class="thumb"></span></span>
+          <span>Errors en directe</span>
+        </label>
+        <button type="button" class="icon-btn" id="sound" aria-label="Activa o desactiva el so" aria-pressed="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path class="spk" d="M4 9h4l5-4v14l-5-4H4z"/>
+            <path class="waves" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path class="mute" d="M16 9l6 6M22 9l-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+    </section>
+
+    <section class="hud" aria-label="Estadístiques">
+      <div class="stat"><span class="label">Nivell</span><span class="value" id="hud-level">1</span></div>
+      <div class="stat"><span class="label">Espies</span><span class="value" id="hud-spies">1</span></div>
+      <div class="stat"><span class="label">Temps</span><span class="value" id="hud-time">0:00</span></div>
+      <div class="stat"><span class="label">Moviments</span><span class="value" id="hud-moves">0</span></div>
+      <div class="stat"><span class="label">Pistes</span><span class="value" id="hud-hints">0</span></div>
+      <div class="stat"><span class="label">Rècord</span><span class="value" id="hud-best">–</span></div>
+    </section>
+
+    <section class="board-wrap">
+      <div id="board" class="board" tabindex="0"
+           aria-label="Tauler de joc. Fletxes del teclat per moure't, Espai per agafar i deixar una peça, R per girar-la."></div>
+    </section>
+
+    <section class="controls" aria-label="Accions">
+      <button class="btn" id="btn-undo" type="button" title="Desfer (Ctrl+Z)"><span aria-hidden="true">↶</span> Desfer</button>
+      <button class="btn" id="btn-hint" type="button" title="Fixa una peça al seu lloc"><span aria-hidden="true">✦</span> Pista</button>
+      <button class="btn primary" id="btn-check" type="button"><span aria-hidden="true">✓</span> Comprovar</button>
+      <button class="btn primary" id="btn-next" type="button" hidden>Següent nivell <span aria-hidden="true">→</span></button>
+      <button class="btn" id="btn-restart" type="button"><span aria-hidden="true">↺</span> Reiniciar nivell</button>
+      <button class="btn ghost" id="btn-new" type="button"><span aria-hidden="true">★</span> Nou joc</button>
+    </section>
+
+    <details class="rules" id="rules">
+      <summary>Com es juga</summary>
+      <div class="rules-body">
+        <p>Totes les caselles, menys les dels espies, tenen una peça. Reorganitza-les fins que es compleixin aquestes tres condicions:</p>
+        <ol>
+          <li>Cada <strong>fletxa</strong> apunta a la casella del costat en la seva direcció, i allà hi ha d'haver una <strong>peça blanca</strong>.</li>
+          <li>Cap fletxa no pot apuntar a una altra fletxa, a un espia ni fora del tauler.</li>
+          <li>Cada <strong>peça blanca</strong> ha de rebre almenys una fletxa.</li>
+        </ol>
+
+        <ul class="legend">
+          <li><span class="mini ortho" data-icon="ortho"></span><span><strong>Fletxa recta.</strong> Gira de 90 en 90°: sempre serà recta.</span></li>
+          <li><span class="mini diag" data-icon="diag"></span><span><strong>Fletxa diagonal.</strong> Gira de 90 en 90°: sempre serà diagonal.</span></li>
+          <li><span class="mini blank" data-icon="blank"></span><span><strong>Peça blanca.</strong> Ha de rebre alguna fletxa.</span></li>
+          <li><span class="mini blank lonely" data-icon="blank"></span><span><strong>Peça blanca sola.</strong> Marcada en vermell mentre cap fletxa no l'assenyali.</span></li>
+          <li><span class="mini spy" data-icon="spy"></span><span><strong>Espia.</strong> No es mou i ningú no l'ha d'assenyalar.</span></li>
+        </ul>
+
+        <h3>Controls</h3>
+        <ul class="howto">
+          <li><strong>Arrossega</strong> una peça sobre una altra per intercanviar-les (ratolí o dit).</li>
+          <li><strong>Clica o toca</strong> una fletxa per girar-la cap a la dreta. Clic dret: cap a l'esquerra.</li>
+          <li>Passa el ratolí per sobre d'una fletxa per veure a quina casella apunta.</li>
+          <li>Teclat: <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> per moure't, <kbd>Espai</kbd> per agafar i deixar, <kbd>R</kbd> per girar (<kbd>Maj</kbd>+<kbd>R</kbd> a l'esquerra), <kbd>Ctrl</kbd>+<kbd>Z</kbd> per desfer.</li>
+          <li>Cada nivell afegeix un espia més, fins al màxim que admet el tauler.</li>
+        </ul>
+      </div>
+    </details>
+
+    <p class="footer">El progrés es desa en aquest navegador.</p>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <div id="modal" class="modal" hidden>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="m-title">
+      <span class="stamp stamp-ok">Missió complerta</span>
+      <h2 id="m-title">Nivell superat</h2>
+      <p class="m-sub" id="m-sub"></p>
+      <div class="stars" id="m-stars" aria-hidden="true"></div>
+      <div class="m-stats">
+        <div><span class="label">Temps</span><span class="value" id="m-time">0:00</span></div>
+        <div><span class="label">Moviments</span><span class="value" id="m-moves">0</span></div>
+        <div><span class="label">Pistes</span><span class="value" id="m-hints">0</span></div>
+      </div>
+      <p class="m-note" id="m-note"></p>
+      <div class="m-actions">
+        <button class="btn primary" id="m-next" type="button">Següent nivell <span aria-hidden="true">→</span></button>
+        <button class="btn" id="m-replay" type="button">Un altre d'aquest nivell</button>
+        <button class="btn ghost" id="m-close" type="button">Veure el tauler</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
